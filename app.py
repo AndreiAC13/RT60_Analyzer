@@ -16,6 +16,15 @@ if 'confirm_reset' not in st.session_state: st.session_state.confirm_reset = Fal
 if 'rt_active' not in st.session_state: st.session_state.rt_active = False
 if 'stipa_active' not in st.session_state: st.session_state.stipa_active = False
 
+# --- HEADER ---
+st.title("🎛️ Raumakustik Auswertungstool")
+st.markdown("##### Erstellt von HSMW Student Andrei Zamshev")
+st.markdown("Analyse nach **DIN 18041 (Gruppe A & B)** und **DIN EN IEC 60268-16**")
+
+
+# --- TABS ---
+tab1, tab2 = st.tabs(["📊 RT60/EDT/C50/C80/D50 (DIN 18041)", "🗣️ STIPA"])
+
 # --- HILFSFUNKTIONEN ---
 
 def get_param_info(param_name):
@@ -23,7 +32,8 @@ def get_param_info(param_name):
     info = {
         "T30": """
         **Nachhallzeit T30**
-        Die Zeitspanne, in der der Schalldruckpegel um 60 dB abfällt. Maßgeblich für DIN 18041 Gruppe A.
+        Definition: T30 misst den Abfall von 30 dB (T30 = 2 x Zeit für 30 dB Abfall), während die RT60 die volle Zeit bis zum 60 dB Abfall angibt (RT60 = 3 x T20, oder T30 x 2).
+        In der Praxis wird oft T20 oder T30 gemessen, da das Signal-Rausch-Verhältnis für 60 dB Abfall oft nicht ausreicht.
         """,
         "T20": """
         **Nachhallzeit T20**
@@ -60,6 +70,12 @@ def calculate_target_AV_ratio(usage, h):
     
     # Bestimmung der Basisparameter je nach Nutzung
     # Werte aus Tabelle 3 der Norm
+    #-----#GRUPPE B BERECHNUNG#-----#
+    #-----#GRUPPE B BERECHNUNG#-----#
+    #-----#GRUPPE B BERECHNUNG#-----#
+    #-----#GRUPPE B BERECHNUNG#-----#
+    #-----#GRUPPE B BERECHNUNG#-----#
+    #-----#GRUPPE B BERECHNUNG#-----#
     limits = {
         "B2": {"small": 0.15, "x": 4.80},
         "B3": {"small": 0.20, "x": 3.13},
@@ -81,7 +97,7 @@ def calculate_target_AV_ratio(usage, h):
         denom = val["x"] + 4.69 * np.log10(h)
         result = 1.0 / denom
         
-    return round(result, 2)
+    return round(result, 2)  #gerundet
 
 def create_pdf(v_raum, cat, plot_fig, df_res, param_label, av_results=None):
     """Erstellt PDF Bericht inkl. Gruppe B Daten falls vorhanden."""
@@ -132,15 +148,6 @@ def create_pdf(v_raum, cat, plot_fig, df_res, param_label, av_results=None):
         pdf.ln()
         
     return pdf.output(dest='S').encode('latin-1')
-
-# --- HEADER ---
-st.title("🎛️ Raumakustik Auswertungstool")
-st.markdown("##### Erstellt von HSMW Student Andrei Zamshev")
-st.markdown("Analyse nach **DIN 18041 (Gruppe A & B)** und **DIN EN IEC 60268-16**")
-
-# --- TABS ---
-tab1, tab2 = st.tabs(["📊 Raumakustik (DIN 18041)", "🗣️ STIPA"])
-
 # ==============================================================================
 # TAB 1: RT60 & PARAMETER & GRUPPE B
 # ==============================================================================
@@ -169,9 +176,10 @@ with tab1:
 
         V = st.number_input("Volumen V (m³)", value=226.0, step=1.0)
         
-        # Erweiterte Nutzungsarten inkl. Gruppe B
+        # Erweiterte Nutzungsarten inkl. Gruppe B (letzte bearbeitung 12.12.25)
         nutzungsarten = [
             "A1 - Musik", 
+            "A2 - Sprache/Vortrag",
             "A3 - Unterricht / Sprache inklusiv", 
             "A4 - Unterricht inklusiv", 
             "A5 - Sport",
@@ -182,23 +190,40 @@ with tab1:
             "B5 - besonderer Lärmschutz"
         ]
         cat = st.selectbox("Nutzung (DIN 18041):", nutzungsarten)
-        
+
         # --- LOGIK FÜR GRUPPE A (Soll-Nachhallzeit) ---
-        t_soll = 0.0
+        # --- LOGIK FÜR GRUPPE A (Soll-Nachhallzeit) ---
+        # --- LOGIK FÜR GRUPPE A (Soll-Nachhallzeit) ---
+        # --- LOGIK FÜR GRUPPE A (Soll-Nachhallzeit) ---
+        # --- LOGIK FÜR GRUPPE A (Soll-Nachhallzeit) ---
+        t_soll = 0.0 # Startwert 0 bedeutet: Keine Linie zeichnen
         is_group_b = "B" in cat.split(" - ")[0]
 
         if cp["rt"] and not is_group_b:
-            if "A1" in cat: t_soll = 0.45 * np.log10(V) + 0.07 if 30<=V<=30000 else 1.0
-            elif "A3" in cat: t_soll = 0.32 * np.log10(V) - 0.17 if 30<=V<5000 else 0.0
-            elif "A4" in cat: t_soll = 0.26 * np.log10(V) - 0.14 if 30<=V<5000 else 0.0
-            elif "A5" in cat: 
-                t_soll = 0.75 * np.log10(V) - 1.00 if 30<=V<10000 else 2.0
-                if t_soll < 1.3 and V > 200: t_soll = 1.3
-            t_soll = round(t_soll, 2)
-            if t_soll > 0: st.success(f"Ziel Tₘ (Gruppe A): {t_soll} s")
-            else: st.warning("Volumen ungeeignet für Formel")
+            if "A1" in cat: t_soll = 0.45 * np.log10(V) + 0.07 if 30<=V<=1000 else st.error("A1: Volumen muss zwischen 30 und 1000 m³ liegen.")
+            elif "A2" in cat:
+                if 50 <= V < 5000: t_soll = 0.37 * np.log10(V) - 0.14
+                else: st.error("A2: Volumen muss zwischen 50 und 5000 m³ liegen.")
+            elif "A3" in cat: t_soll = 0.32 * np.log10(V) - 0.17 if 30<=V<5000 else st.error("A3: Volumen muss zwischen 30 und 5000 m³ liegen.")
+            elif "A4" in cat: t_soll = 0.26 * np.log10(V) - 0.14 if 30<=V<500 else st.error("A4: Volumen muss zwischen 30 und 500 m³ liegen.")
+            elif "A5" in cat:
+                # A5: ab 200 m3
+                if 200 <= V < 10000:
+                    t_soll = 0.75 * np.log10(V) - 1.00
+                elif V >= 10000:
+                    t_soll = 2.0
+                else:
+                    st.error("A5: Volumen muss mindestens 200 m³ betragen.")
+                    # Ergebnis anzeigen (nur wenn gültig)
+            if t_soll > 0:
+                t_soll = round(t_soll, 2)
+                st.success(f"Ziel Tₘ: {t_soll} s")
 
         # --- LOGIK FÜR GRUPPE B (Zusätzliche Eingabefelder + Sabine Rückrechnung) ---
+         # --- LOGIK FÜR GRUPPE B (Zusätzliche Eingabefelder + Sabine Rückrechnung) ---
+          # --- LOGIK FÜR GRUPPE B (Zusätzliche Eingabefelder + Sabine Rückrechnung) ---
+           # --- LOGIK FÜR GRUPPE B (Zusätzliche Eingabefelder + Sabine Rückrechnung) ---
+           
         target_AV = 0.0
         h_raum = 0.0
         a_calc_input = 0.0
