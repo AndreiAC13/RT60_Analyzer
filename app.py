@@ -99,37 +99,84 @@ def calculate_target_AV_ratio(usage, h):
         
     return round(result, 2)  #gerundet
 
+#---PDF-Anfang---#
+#---PDF-Anfang---#
+#---PDF-Anfang---#
+#---PDF-Anfang---#
+#---PDF-Anfang---#
+
 def create_pdf(v_raum, cat, plot_fig, df_res, param_label, av_results=None):
-    """Erstellt PDF Bericht inkl. Gruppe B Daten falls vorhanden."""
+    """Erstellt PDF Bericht inkl. Gruppe B Daten und detaillierter T_mid Berechnung."""
     pdf = FPDF()
     
-    # Seite 1: Grafik
+    # Seite 1: Header & Zusammenfassung
     pdf.add_page()
     pdf.set_font("Arial", 'B', 16)
     pdf.cell(0, 10, f"Bericht: {param_label}", 0, 1, 'C')
     pdf.set_font("Arial", '', 12)
     pdf.cell(0, 10, f"Raum: {v_raum} m3 | Nutzung: {cat}", 0, 1, 'C')
     
+    # Cursor-Position für dynamisches Layout (startet unter dem Header)
+    current_y = 35 
+
+    # --- BLOCK 1: GRUPPE B ERGEBNISSE (falls vorhanden) ---
     if av_results and "B" in cat:
-        pdf.ln(5)
-        pdf.set_font("Arial", 'B', 12)
-        pdf.cell(0, 10, "Ergebnisse DIN 18041 Gruppe B:", 0, 1, 'C')
-        pdf.set_font("Arial", '', 11)
-        pdf.cell(0, 8, f"Soll A/V: > {av_results['target']:.2f} 1/m", 0, 1, 'C')
-        pdf.cell(0, 8, f"Ist A/V: {av_results['actual']:.2f} 1/m", 0, 1, 'C')
+        pdf.set_xy(10, current_y)
+        pdf.set_font("Arial", 'B', 11)
+        pdf.cell(0, 8, "Ergebnisse DIN 18041 Gruppe B:", 0, 1, 'L')
+        pdf.set_font("Arial", '', 10)
+        pdf.cell(0, 5, f"Soll A/V: > {av_results['target']:.2f} 1/m", 0, 1, 'L')
+        pdf.cell(0, 5, f"Ist A/V:  {av_results['actual']:.2f} 1/m", 0, 1, 'L')
+        
         status = "ERFÜLLT" if av_results['passed'] else "NICHT ERFÜLLT"
         pdf.set_text_color(0, 128, 0) if av_results['passed'] else pdf.set_text_color(255, 0, 0)
-        pdf.cell(0, 8, f"Status: {status}", 0, 1, 'C')
-        pdf.set_text_color(0, 0, 0)
+        pdf.cell(0, 5, f"Status: {status}", 0, 1, 'L')
+        pdf.set_text_color(0, 0, 0) # Farbe zurücksetzen
+        
+        current_y += 25 # Platzhalter nach unten schieben
 
+    # --- BLOCK 2: T_MID BERECHNUNG (Nur für Zeit-Parameter) ---
+    # Wir prüfen, ob wir T30, T20 oder EDT vor uns haben
+    if "T" in param_label or "EDT" in param_label:
+        # Wir suchen die Werte in der übergebenen Tabelle (df_res)
+        if "Freq" in df_res.columns and "Mittelwert" in df_res.columns:
+            try:
+                # Werte filtern
+                v500 = df_res.loc[df_res['Freq'] == 500, 'Mittelwert'].values[0]
+                v1k  = df_res.loc[df_res['Freq'] == 1000, 'Mittelwert'].values[0]
+                v2k  = df_res.loc[df_res['Freq'] == 2000, 'Mittelwert'].values[0]
+
+                # Wenn alle Werte da sind (nicht NaN), Berechnung anzeigen
+                if pd.notna(v500) and pd.notna(v1k) and pd.notna(v2k):
+                    t_mid_calc = (v500 + v1k + v2k) / 3
+                    
+                    pdf.set_xy(10, current_y)
+                    pdf.set_font("Arial", 'B', 11)
+                    pdf.cell(0, 8, "Berechnung T_mid (Mittelwert 500 Hz - 2000 Hz):", 0, 1, 'L')
+                    
+                    pdf.set_font("Arial", '', 10)
+                    pdf.cell(0, 5, "Formel: (T_500 + T_1000 + T_2000) / 3", 0, 1, 'L')
+                    # Hier werden die konkreten Zahlen eingesetzt:
+                    pdf.cell(0, 5, f"Werte:   ({v500:.2f} + {v1k:.2f} + {v2k:.2f}) / 3", 0, 1, 'L')
+                    
+                    pdf.set_font("Arial", 'B', 10)
+                    pdf.cell(0, 5, f"Ergebnis: = {t_mid_calc:.2f} s", 0, 1, 'L')
+                    
+                    current_y += 25 # Platzhalter nach unten schieben
+            except:
+                pass # Falls Daten fehlen (z.B. Frequenz nicht gemessen), nichts anzeigen
+
+    # --- BLOCK 3: GRAFIK ---
+    # Grafik wird unter den Textblöcken platziert
     with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmpfile:
         plot_fig.savefig(tmpfile.name, dpi=150, bbox_inches='tight')
-        pdf.image(tmpfile.name, x=10, y=60 if av_results else 40, w=190)
+        # Wir platzieren das Bild dynamisch bei 'current_y' plus etwas Abstand
+        pdf.image(tmpfile.name, x=10, y=current_y + 5, w=190)
     
-    # Seite 2: Tabelle
+    # Seite 2: Datentabelle
     pdf.add_page()
     pdf.set_font("Arial", 'B', 12)
-    pdf.cell(0, 10, "Messergebnisse", 0, 1, 'L')
+    pdf.cell(0, 10, "Messergebnisse (Tabelle)", 0, 1, 'L')
     pdf.ln(5)
     
     pdf.set_font("Arial", 'B', 9)
@@ -148,6 +195,13 @@ def create_pdf(v_raum, cat, plot_fig, df_res, param_label, av_results=None):
         pdf.ln()
         
     return pdf.output(dest='S').encode('latin-1')
+
+
+#---PDF-Ende---#
+#---PDF-Ende---#
+#---PDF-Ende---#
+#---PDF-Ende---#
+#---PDF-Ende---#
 # ==============================================================================
 # TAB 1: RT60 & PARAMETER & GRUPPE B
 # ==============================================================================
@@ -157,7 +211,13 @@ with tab1:
     with c_set:
         st.subheader("⚙️ Einstellungen")
         
-        # Parameter Wahl
+        # Parameter Wahl (so einer Art Karte)
+        # Parameter Wahl (so einer Art Karte)
+        # Parameter Wahl (so einer Art Karte)
+        # Parameter Wahl (so einer Art Karte)
+        # Parameter Wahl (so einer Art Karte)
+        # Parameter Wahl (so einer Art Karte)
+        # Parameter Wahl (so einer Art Karte)
         param_choice = st.selectbox("Parameter:", 
             ["T30 (Nachhall)", "T20 (Nachhall)", "EDT", "C50 (Sprache)", "C80 (Musik)", "D50 (Deutlichkeit)"])
         
@@ -290,6 +350,13 @@ with tab1:
             res, warns = [], []
             calculated_A_mean = 0.0
             
+
+            #---DATEN EXTRAHIEREN---# oden ist den Massiv mit den Frequenzen
+            #---DATEN EXTRAHIEREN---#
+            #---DATEN EXTRAHIEREN---#
+            #---DATEN EXTRAHIEREN---#
+            #---DATEN EXTRAHIEREN---#
+            #---DATEN EXTRAHIEREN---#
             if files:
                 for f in files:
                     try:
@@ -297,12 +364,13 @@ with tab1:
                         s = io.StringIO(c)
                         fd = []
                         bad_r = 0
-                        for l in s:
-                            if l.strip() and l.strip()[0].isdigit():
-                                p = l.split(',')
-                                if len(p) >= 17:
+                        for l in s:                                  #FILTER!!!!!!!
+                            if l.strip() and l.strip()[0].isdigit(): #nur die Zeilen, die mit einem Ziffer anfangen, nehmen
+                                p = l.split(',') #spalten bilden (überall wo komma steht --> schneiden)
+                                if len(p) >= 17: #Bedingung für die korrekte Dateien (minimal 17 spalten)
                                     fr = float(p[0])
-                                    v = float(p[cp["idx"]])
+                                    v = float(p[cp["idx"]]) #Karte greifen
+                                    #korrelation überprüfen
                                     if cp["r"] and 125 <= fr <= 4000:
                                         try:
                                             if abs(float(p[cp["r"]])) < 0.95: bad_r += 1
@@ -332,10 +400,11 @@ with tab1:
                 
                 i500 = np.where(freqs==500)[0][0]
                 i1k = np.where(freqs==1000)[0][0]
+                i2k  = np.where(freqs==2000)[0][0]
                 tm = 0; fs = 0
                 
                 if cp["rt"]:
-                    tm = np.nanmean([mean_val[i500], mean_val[i1k]])
+                    tm = np.nanmean([mean_val[i500], mean_val[i1k], mean_val[i2k]])
                     if tm > 0: fs = 2000 * np.sqrt(tm/V)
                     
                     # Für Gruppe B: Berechnung von A aus T im Bereich 250Hz - 2000Hz aus den Dateien
@@ -496,7 +565,7 @@ with tab2:
                 for f in fs_sort:
                     try:
                         txt = f.getvalue().decode("utf-8", errors='ignore')
-                        m = re.findall(r'\d{2}:\d{2}:\d{2}\s+(0,\d{2})', txt)
+                        m = re.findall(r'\d{2}:\d{2}:\d{2}\s+([0-1],\d{2})', txt)
                         if m: raw.append(float(m[-1].replace(',', '.')))
                     except: pass
                 
