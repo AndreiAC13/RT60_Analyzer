@@ -280,7 +280,7 @@ with tab1:
                 st.success(f"Ziel Tₘ: {t_soll} s")
                 # --- NEU: AUSWAHL BERECHNUNGSMETHODE ---
             st.markdown("---")
-            st.markdown("**Berechnungsgrundlage $T_{mid}$**")
+            st.markdown("**Berechnung für $T_{mid}$**")
             t_mid_method = st.radio(
                 "Frequenzbereich wählen:",
                 ["Oktaven (500, 1k, 2k)", "Terzen (400 - 1250 Hz)"],
