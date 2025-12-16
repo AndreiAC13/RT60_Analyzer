@@ -314,16 +314,17 @@ with tab1:
 
             a_calc_input = st.number_input("Äquiv. Absorptionsfläche A (m²)", value=0.0, step=1.0, 
                                            help="Manuelle Eingabe überschreibt die Berechnung aus Messdateien.")
-            t_mid_method = "Oktaven (500, 1k, 2k)"
-            if cp["rt"]:
-                        st.markdown("---")
-            st.markdown("**Berechnung für $T_{mid}$**")
-            t_mid_method = st.radio(
-                "Frequenzbereich wählen:",
-                ["Oktaven (500, 1k, 2k)", "Terzen (400 - 1250 Hz)"],
-                index=0,
-                key="tm_method"
-            )
+            
+        t_mid_method = "Oktaven (500, 1k, 2k)"
+        if cp["rt"]:
+             st.markdown("---")
+             st.markdown("**Berechnung für $T_{mid}$**")
+             t_mid_method = st.radio(
+            "Frequenzbereich wählen:",
+            ["Oktaven (500, 1k, 2k)", "Terzen (400 - 1250 Hz)"],
+            index=0,
+            key="tm_method"
+        )
 
         # Farben
         with st.expander("🎨 Farben"):
