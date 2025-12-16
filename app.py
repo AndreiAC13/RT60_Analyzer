@@ -234,7 +234,7 @@ with tab1:
 
         with st.expander("ℹ️ Info"): st.markdown(get_param_info(key))
 
-        V = st.number_input("Volumen V (m³)", value=226.0, step=1.0)
+        V = st.number_input("Volumen V (m³)", value=442.0, step=1.0)
         
         # Erweiterte Nutzungsarten inkl. Gruppe B (letzte bearbeitung 12.12.25)
         nutzungsarten = [
