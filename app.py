@@ -105,7 +105,7 @@ def calculate_target_AV_ratio(usage, h):
 #---PDF-Anfang---#
 #---PDF-Anfang---#
 
-def create_pdf(v_raum, cat, plot_fig, df_res, param_label, av_results=None):
+def create_pdf(v_raum, cat, plot_fig, df_res, param_label, av_results=None, method="Oktaven"):
     """Erstellt PDF Bericht inkl. Gruppe B Daten und detaillierter T_mid Berechnung."""
     pdf = FPDF()
     
@@ -116,10 +116,9 @@ def create_pdf(v_raum, cat, plot_fig, df_res, param_label, av_results=None):
     pdf.set_font("Arial", '', 12)
     pdf.cell(0, 10, f"Raum: {v_raum} m3 | Nutzung: {cat}", 0, 1, 'C')
     
-    # Cursor-Position für dynamisches Layout (startet unter dem Header)
     current_y = 35 
 
-    # --- BLOCK 1: GRUPPE B ERGEBNISSE (falls vorhanden) ---
+    # --- BLOCK 1: GRUPPE B ERGEBNISSE ---
     if av_results and "B" in cat:
         pdf.set_xy(10, current_y)
         pdf.set_font("Arial", 'B', 11)
@@ -127,64 +126,65 @@ def create_pdf(v_raum, cat, plot_fig, df_res, param_label, av_results=None):
         pdf.set_font("Arial", '', 10)
         pdf.cell(0, 5, f"Soll A/V: > {av_results['target']:.2f} 1/m", 0, 1, 'L')
         pdf.cell(0, 5, f"Ist A/V:  {av_results['actual']:.2f} 1/m", 0, 1, 'L')
-        
         status = "ERFÜLLT" if av_results['passed'] else "NICHT ERFÜLLT"
         pdf.set_text_color(0, 128, 0) if av_results['passed'] else pdf.set_text_color(255, 0, 0)
         pdf.cell(0, 5, f"Status: {status}", 0, 1, 'L')
-        pdf.set_text_color(0, 0, 0) # Farbe zurücksetzen
-        
-        current_y += 25 # Platzhalter nach unten schieben
+        pdf.set_text_color(0, 0, 0)
+        current_y += 25
 
-    # --- BLOCK 2: T_MID BERECHNUNG (Nur für Zeit-Parameter) ---
-    # Wir prüfen, ob wir T30, T20 oder EDT vor uns haben
+    # --- BLOCK 2: T_MID BERECHNUNG ---
     if "T" in param_label or "EDT" in param_label:
-        # Wir suchen die Werte in der übergebenen Tabelle (df_res)
         if "Freq" in df_res.columns and "Mittelwert" in df_res.columns:
             try:
-                # Werte filtern
-                v500 = df_res.loc[df_res['Freq'] == 500, 'Mittelwert'].values[0]
-                v1k  = df_res.loc[df_res['Freq'] == 1000, 'Mittelwert'].values[0]
-                v2k  = df_res.loc[df_res['Freq'] == 2000, 'Mittelwert'].values[0]
-
-                # Wenn alle Werte da sind (nicht NaN), Berechnung anzeigen
-                if pd.notna(v500) and pd.notna(v1k) and pd.notna(v2k):
-                    t_mid_calc = (v500 + v1k + v2k) / 3
-                    
-                    pdf.set_xy(10, current_y)
-                    pdf.set_font("Arial", 'B', 11)
+                pdf.set_xy(10, current_y)
+                pdf.set_font("Arial", 'B', 11)
+                
+                val_list = []
+                
+                if "Oktaven" in method:
+                    # Klassische Methode (500, 1k, 2k)
+                    target_freqs = [500, 1000, 2000]
+                    formula_txt = "(T_500 + T_1000 + T_2000) / 3"
                     pdf.cell(0, 8, "Berechnung T_mid (Mittelwert 500 Hz - 2000 Hz):", 0, 1, 'L')
+                else:
+                    # Terz Methode (400 - 1250)
+                    target_freqs = [400, 500, 630, 800, 1000, 1250]
+                    formula_txt = "Mittelwert Terzen (400, 500, 630, 800, 1k, 1.25k)"
+                    pdf.cell(0, 8, "Berechnung T_mid (Bereich 400 Hz - 1250 Hz):", 0, 1, 'L')
+
+                # Werte sammeln
+                for f in target_freqs:
+                    v = df_res.loc[df_res['Freq'] == f, 'Mittelwert'].values
+                    if len(v) > 0 and pd.notna(v[0]):
+                        val_list.append(v[0])
+                
+                if len(val_list) == len(target_freqs):
+                    t_mid_calc = sum(val_list) / len(val_list)
                     
                     pdf.set_font("Arial", '', 10)
-                    pdf.cell(0, 5, "Formel: (T_500 + T_1000 + T_2000) / 3", 0, 1, 'L')
-                    # Hier werden die konkreten Zahlen eingesetzt:
-                    pdf.cell(0, 5, f"Werte:   ({v500:.2f} + {v1k:.2f} + {v2k:.2f}) / 3", 0, 1, 'L')
+                    pdf.cell(0, 5, f"Methode: {formula_txt}", 0, 1, 'L')
+                    
+                    # Werte String bauen
+                    val_str = " + ".join([f"{x:.2f}" for x in val_list])
+                    pdf.cell(0, 5, f"Werte: ({val_str}) / {len(val_list)}", 0, 1, 'L')
                     
                     pdf.set_font("Arial", 'B', 10)
                     pdf.cell(0, 5, f"Ergebnis: = {t_mid_calc:.2f} s", 0, 1, 'L')
-                    
-                    current_y += 25 # Platzhalter nach unten schieben
-            except:
-                pass # Falls Daten fehlen (z.B. Frequenz nicht gemessen), nichts anzeigen
+                    current_y += 25
+            except: pass
 
     # --- BLOCK 3: GRAFIK ---
-    # Grafik wird unter den Textblöcken platziert
     with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmpfile:
         plot_fig.savefig(tmpfile.name, dpi=150, bbox_inches='tight')
-        # Wir platzieren das Bild dynamisch bei 'current_y' plus etwas Abstand
         pdf.image(tmpfile.name, x=10, y=current_y + 5, w=190)
     
-    # Seite 2: Datentabelle
+    # Seite 2: Tabelle
     pdf.add_page()
-    pdf.set_font("Arial", 'B', 12)
-    pdf.cell(0, 10, "Messergebnisse (Tabelle)", 0, 1, 'L')
-    pdf.ln(5)
-    
+    pdf.set_font("Arial", 'B', 12); pdf.cell(0, 10, "Messergebnisse (Tabelle)", 0, 1, 'L'); pdf.ln(5)
     pdf.set_font("Arial", 'B', 9)
     col_w = 25 if len(df_res.columns) > 5 else 30
-    for col in df_res.columns:
-        pdf.cell(col_w, 8, str(col), 1, 0, 'C')
+    for col in df_res.columns: pdf.cell(col_w, 8, str(col), 1, 0, 'C')
     pdf.ln()
-    
     pdf.set_font("Arial", '', 9)
     for i, row in df_res.iterrows():
         for item in row:
@@ -278,6 +278,15 @@ with tab1:
             if t_soll > 0:
                 t_soll = round(t_soll, 2)
                 st.success(f"Ziel Tₘ: {t_soll} s")
+                # --- NEU: AUSWAHL BERECHNUNGSMETHODE ---
+            st.markdown("---")
+            st.markdown("**Berechnungsgrundlage $T_{mid}$**")
+            t_mid_method = st.radio(
+                "Frequenzbereich wählen:",
+                ["Oktaven (500, 1k, 2k)", "Terzen (400 - 1250 Hz)"],
+                index=0,
+                key="tm_method"
+            )
 
         # --- LOGIK FÜR GRUPPE B (Zusätzliche Eingabefelder + Sabine Rückrechnung) ---
          # --- LOGIK FÜR GRUPPE B (Zusätzliche Eingabefelder + Sabine Rückrechnung) ---
@@ -398,21 +407,47 @@ with tab1:
                 mean_val = np.nanmean(mat, axis=1)
                 std_val = np.nanstd(mat, axis=1)
                 
-                i500 = np.where(freqs==500)[0][0]
-                i1k = np.where(freqs==1000)[0][0]
-                i2k  = np.where(freqs==2000)[0][0]
+                # --- Terzen_Neuigkeiten --- #
+                # --- Terzen_Neuigkeiten --- #
+                # --- Terzen_Neuigkeiten --- #
+                # --- Terzen_Neuigkeiten --- #
+                # --- Terzen_Neuigkeiten --- #
+                # --- Terzen_Neuigkeiten --- #
+                # --- Terzen_Neuigkeiten --- #
                 tm = 0; fs = 0
                 
+                # Berechnung basierend auf Auswahl (t_mid_method kommt von links)
                 if cp["rt"]:
-                    tm = np.nanmean([mean_val[i500], mean_val[i1k], mean_val[i2k]])
+                    val_indices = []
+                    # Bestimmen welche Frequenzen wir wollen
+                    if "Oktaven" in t_mid_method:
+                        # Klassisch: 500, 1000, 2000
+                        target_fs = [500, 1000, 2000]
+                    else:
+                        # Terzen: 400, 500, 630, 800, 1000, 1250
+                        target_fs = [400, 500, 630, 800, 1000, 1250]
+                    
+                    # Werte sammeln
+                    collected_vals = []
+                    for tf in target_fs:
+                        # Wir suchen den Index im freqs Array
+                        if tf in freqs:
+                            # Wo ist diese Frequenz im Array?
+                            idx = np.where(freqs == tf)[0][0]
+                            # Wert holen
+                            collected_vals.append(mean_val[idx])
+                    
+                    # Durchschnitt berechnen (nur wenn Werte gefunden wurden)
+                    if collected_vals:
+                        tm = np.nanmean(collected_vals)
+                    
                     if tm > 0: fs = 2000 * np.sqrt(tm/V)
                     
-                    # Für Gruppe B: Berechnung von A aus T im Bereich 250Hz - 2000Hz aus den Dateien
+                    # Für Gruppe B: Berechnung von A aus T (unverändert)
                     if is_group_b:
                         indices_b = [np.where(freqs==f)[0][0] for f in [250, 500, 1000, 2000] if f in freqs]
                         if indices_b:
                             t_vals_b = [mean_val[i] for i in indices_b]
-                            # Sabine Formel: A = 0.163 * V / T
                             a_vals = [(0.163 * V / t) for t in t_vals_b if t > 0]
                             if a_vals:
                                 calculated_A_mean = np.mean(a_vals)
@@ -529,7 +564,7 @@ with tab1:
                 with pd.ExcelWriter(b_ex, engine='openpyxl') as w: df_ex_ref.to_excel(w, index=False)
                 col1.download_button("📊 Excel Export", b_ex.getvalue(), "daten.xlsx", use_container_width=True)
                 
-                pdf_d = create_pdf(V, cat, plot_fig_ref, df_ex_ref, cp['label'], av_results=av_results_pdf)
+                pdf_d = create_pdf(V, cat, plot_fig_ref, df_ex_ref, cp['label'], av_results=av_results_pdf, method=t_mid_method)
                 col2.download_button("📄 PDF Bericht", pdf_d, "bericht.pdf", "application/pdf", use_container_width=True)
 
                 with st.expander("📋 Tabelle"):
