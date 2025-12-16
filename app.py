@@ -435,7 +435,7 @@ with tab1:
                     ax.axhline(t_soll, color=c_target, linestyle='--', linewidth=2, label=f'Zielwert {t_soll}s')
 
                 if fs > 0 and cp["rt"]:
-                    ax.axvline(fs, color='blue', linestyle=':', label=f'Schröder ({int(fs)} Hz)')
+                    ax.axvline(fs, color='blue', linestyle=':', label=f'Schröder-Eckfrequenz ({int(fs)} Hz)')
 
                 for i in range(mat.shape[1]):
                     ax.semilogx(freqs, mat[:, i], color=c_single, alpha=0.5, linewidth=0.8)
