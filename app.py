@@ -23,7 +23,7 @@ st.markdown("Analyse nach **DIN 18041 (Gruppe A & B)** und **DIN EN IEC 60268-16
 
 
 # --- TABS ---
-tab1, tab2 = st.tabs(["📊 RT60/EDT/C50/C80/D50 (DIN 18041)", "🗣️ STIPA"])
+tab1, tab2 = st.tabs(["📊 RT60/EDT/C50/C80/D50 (DIN 18041)", "🗣️ STIPA (DIN EN IEC 60268-16)"])
 
 # --- HILFSFUNKTIONEN ---
 
